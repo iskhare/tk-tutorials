@@ -27,14 +27,31 @@ static inline int ceil_div(int a, int b) { return (a + b - 1) / b; }
 static void fill_random(std::vector<float>& x, uint32_t seed) {
     std::mt19937 rng(seed);
     std::uniform_real_distribution<float> dist(-0.5f, 0.5f);
-    // TODO (Section 1): generate random floats and fill in `x` with dist(rng)
+
+     // TODO (Section 1): generate random floats and fill in `x` with dist(rng)
+    for (int i=0; i<x.size(); i++) {
+        x[i] = dist(rng);
+    }
+   
 }
 
+/* A is MxK, B is KxN, C is MxN
+ * A(i,k) lives at A[i*K + k]
+ * B(k,j) lives at B[k*N + j]
+ * C(i,j) lives at C[i*N + j]
+*/
 static void gemm_cpu_naive(const std::vector<float>& A,
                            const std::vector<float>& B,
                            std::vector<float>& C,
                            int M, int N, int K) {
     // TODO (Section 1): naive gemm with triple loop i, j, k (row-major)
+    for (int i=0; i<M; i++) {
+        for (int k=0; k<K; k++) {
+            for (int j=0; j<N; j++) {
+                C[i*N + j] += A[i*K +k] * B[k*N + j];
+            }
+        }
+    }
 }
 
 static void print_stats(const char* name, const std::vector<float>& x) {
@@ -42,6 +59,10 @@ static void print_stats(const char* name, const std::vector<float>& x) {
     float max_abs = 0.0f;
 
     // TODO (Section 1): calculate the sum
+    for (int i=0; i<x.size(); i++) {
+        sum += x[i];
+        max_abs = std::max(max_abs, std::abs(x[i]));
+    }
 
     double avg = x.empty() ? 0.0 : sum / x.size();
     std::printf("%s: avg=%f, max_abs=%f\n", name, avg, max_abs);
@@ -59,6 +80,16 @@ __global__ void gemm_gpu_naive(const float* A, const float* B, float* C,
     if (i >= M || j >= N) return;
 
     // TODO (Section 2): implement naive GEMM kernel
+
+    // We know A points to M*K floats, B points to K*N floats, C points to M*N floats
+    // So A(i,k) lives at A[i*K + k]
+    // B(k,j) lives at B[k*N + j]
+    // C(i,j) lives at C[i*N + j] like before in the CPU GEMM case
+    float val = 0.0f;
+    for (int k=0; k<K; k++) {
+        val += A[i*K + k] * B[k*N + j];
+    }
+    C[i*N + j] = val;
 }
 
 
@@ -76,18 +107,18 @@ int main() {
     int M = 256, N = 256, K = 256;
 
     // TODO (Section 1): allocate host A, B, C, C_ref (row-major)
-    // std::vector<float> ...;
-    // std::vector<float> ...;
-    // std::vector<float> ...;
-    // std::vector<float> ...;
+    std::vector<float> h_A(M*K);
+    std::vector<float> h_B(K*N);
+    std::vector<float> h_C(M*N);
+    std::vector<float> h_Cref(M*N);
 
     // TODO (Section 1): fill A,B with deterministic random
-    // fill_random(...);
-    // fill_random(...);
+    fill_random(h_A, 42);
+    fill_random(h_B, 67);
 
     // TODO (Section 1): run CPU GEMM into Cref, print stats
-    // gemm_cpu_naive(...);
-    // print_stats(...);
+    gemm_cpu_naive(h_A, h_B, h_Cref, M,N,K);
+    print_stats("h_Cref", h_Cref);
 
     // TODO (Section 3): allocate device memory
     float *d_A = nullptr, *d_B = nullptr, *d_C = nullptr;
