@@ -131,8 +131,8 @@ int main() {
     CUDA_CHECK(cudaMalloc(&d_C, M*N*sizeof(float)));
 
     // TODO (Section 3): initialize device memory
-    CUDA_CHECK(cudaMemcpy(d_A, h_A, M*K*sizeof(float), cudaMemcpyHostToDevice));
-    CUDA_CHECK(cudaMemcpy(d_B, h_B, M*K*sizeof(float), cudaMemcpyHostToDevice));
+    CUDA_CHECK(cudaMemcpy(d_A, h_A.data(), M*K*sizeof(float), cudaMemcpyHostToDevice));
+    CUDA_CHECK(cudaMemcpy(d_B, h_B.data(), M*K*sizeof(float), cudaMemcpyHostToDevice));
     CUDA_CHECK(cudaMemset(d_C, 0, M*N*sizeof(float)));
     
 
@@ -154,7 +154,7 @@ int main() {
     // CUDA_CHECK(cudaEventDestroy(stop));
 
     // TODO (Section 3): copy C back to host, print out max absolute error
-    CUDA_CHECK(cudaMemcpy(h_C, d_C, M*N*sizeof(float), cudaMemcpyDeviceToHost));
+    CUDA_CHECK(cudaMemcpy(h_C.data(), d_C, M*N*sizeof(float), cudaMemcpyDeviceToHost));
     std::printf("max_abs_error: %f\n", max_abs_error(h_C_ref, h_C));
 
     // TODO (Section 3): free device memory
