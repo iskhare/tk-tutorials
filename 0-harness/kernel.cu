@@ -98,8 +98,12 @@ __global__ void gemm_gpu_naive(const float* A, const float* B, float* C,
 // -----------------------
 static float max_abs_error(const std::vector<float>& ref,
                            const std::vector<float>& got) {
+    float error = 0.0f;
+    for (int i=0; i<ref.size(); i++) {
+        error = std::max(error, std::abs(ref[i] - got[i]));
+    }
     // TODO (Section 3): compute max |ref - got|
-    return 0.0f;
+    return error;
 }
 
 
@@ -110,32 +114,34 @@ int main() {
     std::vector<float> h_A(M*K);
     std::vector<float> h_B(K*N);
     std::vector<float> h_C(M*N);
-    std::vector<float> h_Cref(M*N);
+    std::vector<float> h_C_ref(M*N);
 
     // TODO (Section 1): fill A,B with deterministic random
     fill_random(h_A, 42);
     fill_random(h_B, 67);
 
     // TODO (Section 1): run CPU GEMM into Cref, print stats
-    gemm_cpu_naive(h_A, h_B, h_Cref, M,N,K);
-    print_stats("h_Cref", h_Cref);
+    gemm_cpu_naive(h_A, h_B, h_C_ref, M,N,K);
+    print_stats("h_C_ref", h_C_ref);
 
     // TODO (Section 3): allocate device memory
     float *d_A = nullptr, *d_B = nullptr, *d_C = nullptr;
-    // CUDA_CHECK(cudaMalloc(...);
-    // CUDA_CHECK(cudaMalloc(...);
-    // CUDA_CHECK(cudaMalloc(...);
+    CUDA_CHECK(cudaMalloc(&d_A, M*K*sizeof(float)));
+    CUDA_CHECK(cudaMalloc(&d_B, K*N*sizeof(float)));
+    CUDA_CHECK(cudaMalloc(&d_C, M*N*sizeof(float)));
 
     // TODO (Section 3): initialize device memory
-    // CUDA_CHECK(cudaMemcpy(d_A, ..., cudaMemcpyHostToDevice));
-    // CUDA_CHECK(cudaMemcpy(d_B, ..., cudaMemcpyHostToDevice));
-    // CUDA_CHECK(cudaMemset(d_C, ...));
+    CUDA_CHECK(cudaMemcpy(d_A, h_A, M*K*sizeof(float), cudaMemcpyHostToDevice));
+    CUDA_CHECK(cudaMemcpy(d_B, h_B, M*K*sizeof(float), cudaMemcpyHostToDevice));
+    CUDA_CHECK(cudaMemset(d_C, 0, M*N*sizeof(float)));
+    
 
     // TODO (Section 3): launch kernel
-    // dim3 block(16, 16);
-    // dim3 grid(ceil_div(N, block.x), ceil_div(M, block.y));
+    dim3 block(16, 16);
+    dim3 grid(ceil_div(N, block.x), ceil_div(M, block.y));
     // launch gemm_gpu_naive
-    // CUDA_CHECK(cudaDeviceSynchronize());
+    gemm_gpu_naive<<<grid, block>>>(d_A, d_B, d_C, M, N, K);
+    CUDA_CHECK(cudaDeviceSynchronize());
 
     // TODO (Section 5): benchmark and report ms + TFLOPs
     // int warmup_iters  = 500;
@@ -148,13 +154,12 @@ int main() {
     // CUDA_CHECK(cudaEventDestroy(stop));
 
     // TODO (Section 3): copy C back to host, print out max absolute error
-    // CUDA_CHECK(cudaMemcpy(..., cudaMemcpyDeviceToHost));
-    // std::printf("max_abs_error: %f\n", max_abs_error(h_C_ref, h_C));
+    CUDA_CHECK(cudaMemcpy(h_C, d_C, M*N*sizeof(float), cudaMemcpyDeviceToHost));
+    std::printf("max_abs_error: %f\n", max_abs_error(h_C_ref, h_C));
 
     // TODO (Section 3): free device memory
-    // CUDA_CHECK(cudaFree(...));
-    // CUDA_CHECK(cudaFree(...));
-    // CUDA_CHECK(cudaFree(...));
-
+    CUDA_CHECK(cudaFree(d_A));
+    CUDA_CHECK(cudaFree(d_B));
+    CUDA_CHECK(cudaFree(d_C));
     return 0;
 }
