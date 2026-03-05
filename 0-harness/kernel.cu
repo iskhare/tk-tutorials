@@ -14,8 +14,17 @@
 // Utilities
 // -----------------------
 #define CUDA_CHECK(call) do { \
-    /* TODO (Section 3): implement error checking */  \
-    (void)(call); \
+    /* TODO (Section 3): implement error checking */ \
+    cudaError_t result = call; \
+    if(result != cudaSuccess) { \
+        fprintf(stderr, \
+                "CUDA Runtime Error: %s:%i:%d = %s\n", \
+                __FILE__, \
+                __LINE__, \
+                result, \
+                cudaGetErrorString(result)); \
+        std::exit(EXIT_FAILURE); \
+    } \
 } while(0)
 
 static inline int ceil_div(int a, int b) { return (a + b - 1) / b; }
@@ -132,7 +141,7 @@ int main() {
 
     // TODO (Section 3): initialize device memory
     CUDA_CHECK(cudaMemcpy(d_A, h_A.data(), M*K*sizeof(float), cudaMemcpyHostToDevice));
-    CUDA_CHECK(cudaMemcpy(d_B, h_B.data(), M*K*sizeof(float), cudaMemcpyHostToDevice));
+    CUDA_CHECK(cudaMemcpy(d_B, h_B.data(), K*N*sizeof(float), cudaMemcpyHostToDevice));
     CUDA_CHECK(cudaMemset(d_C, 0, M*N*sizeof(float)));
     
 
@@ -144,14 +153,36 @@ int main() {
     CUDA_CHECK(cudaDeviceSynchronize());
 
     // TODO (Section 5): benchmark and report ms + TFLOPs
-    // int warmup_iters  = 500;
-    // int profile_iters = 100;
-    // cudaEvent_t start, stop;
-    // CUDA_CHECK(cudaEventCreate(&start));
-    // CUDA_CHECK(cudaEventCreate(&stop));
-    // ...
-    // CUDA_CHECK(cudaEventDestroy(start));
-    // CUDA_CHECK(cudaEventDestroy(stop));
+    int warmup_iters  = 500;
+    int profile_iters = 100;
+    cudaEvent_t start, stop;
+    float ms;
+    CUDA_CHECK(cudaEventCreate(&start));
+    CUDA_CHECK(cudaEventCreate(&stop));
+
+    for (int i = 0; i < warmup_iters; i++) {
+        gemm_gpu_naive<<<grid, block>>>(d_A, d_B, d_C, M, N, K);
+        CUDA_CHECK(cudaGetLastError());
+    }
+    CUDA_CHECK(cudaDeviceSynchronize());
+    CUDA_CHECK(cudaEventRecord( start, 0 ));
+    
+    for (int i = 0; i < profile_iters; i++) {
+        gemm_gpu_naive<<<grid, block>>>(d_A, d_B, d_C, M, N, K);
+        CUDA_CHECK(cudaGetLastError());
+    }
+
+    CUDA_CHECK(cudaEventRecord( stop, 0 ));
+    CUDA_CHECK(cudaEventSynchronize(stop));
+    CUDA_CHECK(cudaEventElapsedTime( &ms, start, stop ));
+
+    float avg_ms = ms / profile_iters;
+    float seconds = avg_ms * 1e-3;
+    float tflops = (2.0 * M * N * K) / seconds / 1e12;
+    std::printf("avg_ms: %f, tflops: %f\n", avg_ms, tflops);
+
+    CUDA_CHECK(cudaEventDestroy(start));
+    CUDA_CHECK(cudaEventDestroy(stop));
 
     // TODO (Section 3): copy C back to host, print out max absolute error
     CUDA_CHECK(cudaMemcpy(h_C.data(), d_C, M*N*sizeof(float), cudaMemcpyDeviceToHost));

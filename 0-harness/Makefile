@@ -1,4 +1,4 @@
-GPU    ?= H100
+GPU    ?= A100
 SRC    := kernel.cu
 OUT    := kernel.out
 CMD    := ./kernel.out
